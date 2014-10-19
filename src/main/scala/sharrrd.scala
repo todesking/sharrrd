@@ -1,14 +1,18 @@
 package com.todesking.sharrrd
 
-trait Sharding[KeyT, HashT, NodeT] {
-  type NodeMapT = NodeMap[NodeT]
+trait Sharding[KeyT, HashT, RealNodeT] {
+  type NodeMapT = NodeMap[RealNodeT]
+
   val currentNodeMap:NodeMapT
-  def nodeMapHistory:Seq[NodeMapT]
+  val nodeMapHistory:Seq[NodeMapT]
   val hashRing:HashRing[KeyT, HashT]
+
   def nodeOf(key:KeyT) = currentNodeMap.realNodeOf(hashRing.virtualNodeFromKey(key))
-  def operate[A](key:KeyT)(f:(NodeT) => A):A =
+
+  def operate[A](key:KeyT)(f:(RealNodeT) => A):A =
     operateUntil(key, 0) {(_, node) => Some(f(node))}.get
-  def operateUntil[A](key:KeyT, maxHistoryDepth:Int)(f:(NodeMapT, NodeT) => Option[A]):Option[A] = {
+
+  def operateUntil[A](key:KeyT, maxHistoryDepth:Int)(f:(NodeMapT, RealNodeT) => Option[A]):Option[A] = {
     val vnode = hashRing.virtualNodeFromKey(key)
     operate0(currentNodeMap, vnode, f)
     nodeMapHistory.take(maxHistoryDepth).foreach {nm =>
@@ -20,7 +24,7 @@ trait Sharding[KeyT, HashT, NodeT] {
     None
   }
 
-  private def operate0[A](nodeMap:NodeMapT, vnode:VirtualNode, f:(NodeMapT, NodeT) => A):A =
+  private def operate0[A](nodeMap:NodeMapT, vnode:VirtualNode, f:(NodeMapT, RealNodeT) => A):A =
     f(nodeMap, nodeMap.realNodeOf(vnode))
 }
 
@@ -33,7 +37,7 @@ trait HashRing[KeyT, HashT] {
 object HashRing {
   abstract class DefaultImpl[KeyT, HashT] extends HashRing[KeyT, HashT] {
     val table:collection.immutable.SortedMap[HashT, VirtualNode]
-    def virtualNodeFromHash(h:HashT):VirtualNode = {
+    override def virtualNodeFromHash(h:HashT):VirtualNode = {
       table.from(h).values.headOption getOrElse table.values.head
     }
   }
@@ -43,9 +47,9 @@ case class VirtualNode(num:Int) extends Ordered[VirtualNode] {
   override def compare(that:VirtualNode):Int = implicitly[Ordering[Int]].compare(this.num, that.num)
 }
 
-trait NodeMap[NodeT] {
+trait NodeMap[RealNodeT] {
   val version:Int
-  def realNodeOf(vn:VirtualNode):NodeT
+  def realNodeOf(vn:VirtualNode):RealNodeT
 }
 
 abstract class Migration[K, H, N, V, S <: Sharding[K, H, N]] {
