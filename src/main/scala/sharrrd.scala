@@ -4,6 +4,7 @@ trait Sharding[KeyT, HashT, RealNodeT] {
   type NodeMapT = NodeMap[RealNodeT]
 
   val currentNodeMap:NodeMapT
+  // sequence of old node maps(newer first)
   val nodeMapHistory:Seq[NodeMapT]
   val hashRing:HashRing[KeyT, HashT]
 
