@@ -1,6 +1,8 @@
+organization := "com.todesking"
+
 name := "sharrrd"
 
-organization := "com.todesking"
+version := "0.0.0"
 
 scalaVersion := "2.10.4"
 
