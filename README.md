@@ -17,6 +17,7 @@ You can customize hash and mapping algorithm. Some default implementations avail
 trait Sharding[KeyT, HashT, RealNodeT] {
   type NodeMapT = NodeMap[RealNodeT]
 
+  def realNodeOf(key:KeyT)
   def operate[A](key:KeyT)(f:(RealNodeT) => A):A
   def operateUntil[A](key:KeyT, maxHistoryDepth:Int)(f:(NodeMapT, RealNodeT) => Option[A]):Option[A]
 }
