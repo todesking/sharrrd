@@ -3,9 +3,9 @@
 ## Basic architecture
 
 ```
-Key =(hash algorithm)=> Hash code =(hash to vnode mapping)=> Virtual node =(vnode to rnode mapping)=> Real node
-     ~~~~~~~~~~~~~~~~~ HashRing[KeyT, HashT] ~~~~~~~~~~~~~~                ~~ NodeMap[RealNodeT] ~~~
-     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Sharding[KeyT, HashT, RealNodeT] ~~~~~~~~~~~~~~~~~~~~~~~~
+Key =(hash algorithm)=> Hash code =(hash to node mapping)=> Real node
+                                  ~ HashRing[KeyT, HashT] ~
+    ~~~~~~~~~~~~~~~~~~~~ Sharding[KeyT, HashT, NodeT] ~~~~~
 ```
 
 You can customize hash and mapping algorithm. Some default implementations available in `HashRing.DefaultImpl` and
