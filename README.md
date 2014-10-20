@@ -23,10 +23,11 @@ val assignmentPolicy = new DefaultAssignmentPolicy(
   RandomSource.fromJavaRandomInt(new java.util.Random(randomSeed))
 )
 
+// Sharding that key = String, hash = Int, node = RedisInstance
 val sharding = new Sharding[String, Int, RedisInstance](
   key => myHashFunction(key),
   new DefaultHashRing(assignmentpolicy).add(redisInstances:_*),
-  Seq()
+  Seq() // recent hash ring definitions(newer first)
 )
 
 def put(key:String, value:Int):Unit = {
