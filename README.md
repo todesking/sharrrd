@@ -51,8 +51,8 @@ def get(key:String):Option[Int] = {
 trait Sharding[KeyT, HashT, RealNodeT] {
   type NodeMapT = NodeMap[RealNodeT]
 
-  def realNodeOf(key:KeyT)
+  def realNodeOf(key:KeyT):RealNodeT
   def operate[A](key:KeyT)(f:(RealNodeT) => A):A
-  def operateUntil[A](key:KeyT, maxHistoryDepth:Int)(f:(NodeMapT, RealNodeT) => Option[A]):Option[A]
+  def operateUntil[A](key:KeyT, maxHistoryDepth:Int)(f:(HashRing[HashT, RealNodeT], RealNodeT) => Option[A]):Option[A]
 }
 ```
