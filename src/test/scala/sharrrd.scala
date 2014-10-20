@@ -73,4 +73,18 @@ class SharrrdSpec extends Specification {
       (1 to 10).map{_ => r1.nextInt()} must_== (1 to 10).map{_ => r2.nextInt()}
     }
   }
+
+  "default AssignmentPolicy" should {
+    "assign hash value for node" in {
+      val p = new HashRing.DefaultAssignmentPolicy[TestNode](100, new HashRing.CloneableRandom(0L))
+
+      val assignResult = p.newAssigner().assign(Set(), TestNode(1))
+
+      assignResult must have size(100)
+
+      p.newAssigner().assign(Set(), TestNode(1)) must_== assignResult
+
+      p.newAssigner().assign(assignResult.toSet, TestNode(1)) must_!= assignResult
+    }
+  }
 }
