@@ -62,21 +62,9 @@ class SharrrdSpec extends Specification {
     }
   }
 
-  "CloneableRandom" should {
-    "clone its current state" in {
-      val r1 = new HashRing.CloneableRandom(0L)
-
-      (1 to 10).foreach { _ => r1.nextInt() }
-
-      val r2 = r1.clone()
-
-      (1 to 10).map{_ => r1.nextInt()} must_== (1 to 10).map{_ => r2.nextInt()}
-    }
-  }
-
   "default AssignmentPolicy" should {
     "assign hash value for node" in {
-      val p = new HashRing.DefaultAssignmentPolicy[TestNode](100, new HashRing.CloneableRandom(0L))
+      val p = new HashRing.DefaultAssignmentPolicy[Int, TestNode](100, HashRing.RandomSource.fromJavaRandomInt(new java.util.Random(0L)))
 
       val assignResult = p.newAssigner().assign(Set(), TestNode(1))
 
@@ -89,7 +77,7 @@ class SharrrdSpec extends Specification {
   }
 
   "default HashRing" should {
-    val policy = new HashRing.DefaultAssignmentPolicy[TestNode](100, new HashRing.CloneableRandom(0L))
+    val policy = new HashRing.DefaultAssignmentPolicy[Int, TestNode](100, HashRing.RandomSource.fromJavaRandomInt(new java.util.Random(0L)))
 
     "lookup node from hash when only one registered node" in {
       val hr = new HashRing.DefaultImpl(collection.immutable.TreeMap(1 -> TestNode(1)), policy)

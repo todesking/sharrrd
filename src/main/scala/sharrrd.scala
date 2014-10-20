@@ -69,23 +69,27 @@ object HashRing {
     }
   }
 
-  class CloneableRandom(random:java.util.Random) extends java.lang.Cloneable {
-    def this(seed:Long) = this(new java.util.Random(seed))
-    def nextInt():Int = random.nextInt()
-
-    override def clone():CloneableRandom = new CloneableRandom(SerializableUtil.clone(random))
+  trait RandomSource[A] {
+    def nextValue():A
+    def copy():RandomSource[A]
   }
 
-  class DefaultAssignmentPolicy[RealNodeT](assignPerNode:Int, r:CloneableRandom) extends AssignmentPolicy[Int, RealNodeT] {
-    def this(assignPerNode:Int, seed:Long) = this(assignPerNode, new CloneableRandom(new java.util.Random(seed)))
-    val randomProto:CloneableRandom = r.clone()
+  object RandomSource {
+    def fromJavaRandomInt(r:java.util.Random):RandomSource[Int] = new RandomSource[Int] {
+      override def nextValue():Int = r.nextInt()
+      override def copy():RandomSource[Int] = fromJavaRandomInt(SerializableUtil.clone(r))
+    }
+  }
+
+  class DefaultAssignmentPolicy[HashT, RealNodeT](assignPerNode:Int, rand:RandomSource[HashT]) extends AssignmentPolicy[HashT, RealNodeT] {
+    val randomProto:RandomSource[HashT] = rand.copy()
 
     def newAssigner() = new Assigner {
-      val random = randomProto.clone()
-      def assign(assigned:Set[Int], node:RealNodeT):Seq[Int] = {
+      val random = randomProto.copy()
+      def assign(assigned:Set[HashT], node:RealNodeT):Seq[HashT] = {
         (0 until assignPerNode) map { _ =>
-          var r = random.nextInt()
-          while(assigned.contains(r)) r = random.nextInt()
+          var r = random.nextValue()
+          while(assigned.contains(r)) r = random.nextValue()
           r
         }
       }
