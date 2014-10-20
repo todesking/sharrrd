@@ -36,9 +36,9 @@ trait HashRing[HashT, RealNodeT] {
   def realNodeOf(hash:HashT):RealNodeT
 }
 
-trait FlexibleHashRing[HashT, RealNodeT] extends HashRing[HashT, RealNodeT] {
-  def add(nodes:Seq[RealNodeT]):this.type
-  def remove(nodes:Seq[RealNodeT]):this.type
+trait FlexibleHashRing[HashT, RealNodeT, SelfT <: HashRing[HashT, RealNodeT]] extends HashRing[HashT, RealNodeT] {
+  def add(nodes:Seq[RealNodeT]):SelfT
+  def remove(nodes:Seq[RealNodeT]):SelfT
 }
 
 object HashRing {
@@ -93,14 +93,18 @@ object HashRing {
     }
   }
 
-  abstract class DefaultImpl[HashT, RealNodeT](
+  class DefaultImpl[HashT, RealNodeT](
     val table:SortedMap[HashT, RealNodeT],
     val assignmentPolicy:AssignmentPolicy[HashT, RealNodeT]
-  ) extends FlexibleHashRing[HashT, RealNodeT] {
+  ) extends FlexibleHashRing[HashT, RealNodeT, DefaultImpl[HashT, RealNodeT]] {
+    def this(assignmentPolicy:AssignmentPolicy[HashT, RealNodeT])(implicit ev:Ordering[HashT]) =
+      this(SortedMap.empty[HashT, RealNodeT], assignmentPolicy)
+
     override def realNodeOf(hash:HashT):RealNodeT = {
       table.from(hash).values.headOption getOrElse table.values.head
     }
-    override def add(nodes:Seq[RealNodeT]):this.type = {
+
+    override def add(nodes:Seq[RealNodeT]):DefaultImpl[HashT, RealNodeT] = {
       val policy = assignmentPolicy.newAssigner()
       val assignments = for {
           node <- nodes
@@ -109,11 +113,13 @@ object HashRing {
 
       newInstance(table ++ assignments, policy.snapshot())
     }
-    override def remove(nodes:Seq[RealNodeT]):this.type = {
+
+    override def remove(nodes:Seq[RealNodeT]):DefaultImpl[HashT, RealNodeT] = {
       newInstance(nodes.foldLeft(table) {(a, x) => a -- a.filter{case (k, v) => v == x}.keys}, assignmentPolicy)
     }
 
-    protected def newInstance(table:SortedMap[HashT, RealNodeT], policy:AssignmentPolicy[HashT, RealNodeT]):this.type
+    private def newInstance(table:SortedMap[HashT, RealNodeT], policy:AssignmentPolicy[HashT, RealNodeT]) =
+      new DefaultImpl[HashT, RealNodeT](table, policy)
   }
 }
 
