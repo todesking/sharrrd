@@ -1,4 +1,4 @@
-# Sharrrd: Basic types and logics for Consistent Hashing with Scala
+# Sharrrd: Consistent Hashing for Scala
 
 ## Basic architecture
 
