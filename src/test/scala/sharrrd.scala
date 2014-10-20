@@ -61,4 +61,16 @@ class SharrrdSpec extends Specification {
       subject.operateUntil(TestKey(1), 100)(f) === Some(1)
     }
   }
+
+  "CloneableRandom" should {
+    "clone its current state" in {
+      val r1 = new HashRing.CloneableRandom(0L)
+
+      (1 to 10).foreach { _ => r1.nextInt() }
+
+      val r2 = r1.clone()
+
+      (1 to 10).map{_ => r1.nextInt()} must_== (1 to 10).map{_ => r2.nextInt()}
+    }
+  }
 }
