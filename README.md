@@ -48,11 +48,29 @@ def get(key:String):Option[Int] = {
 ## Interface
 
 ```scala
-trait Sharding[KeyT, HashT, RealNodeT] {
-  type NodeMapT = NodeMap[RealNodeT]
+class Sharding[KeyT, HashT, RealNodeT] {
+  val currentHashRing:HashRing[HashT, RealNodeT]
+  val oldHashRings:Seq[HashRing[HashT, RealNodeT]] // sequence of old rings(newer first)
 
   def realNodeOf(key:KeyT):RealNodeT
   def operate[A](key:KeyT)(f:(RealNodeT) => A):A
   def operateUntil[A](key:KeyT, maxHistoryDepth:Int)(f:(HashRing[HashT, RealNodeT], RealNodeT) => Option[A]):Option[A]
+}
+
+trait HashRing[HashT, RealNodeT] {
+  def realNodeOf(hash:HashT):RealNodeT
+}
+
+trait FlexibleHashRing[HashT, RealNodeT, SelfT <: HashRing[HashT, RealNodeT]] extends HashRing[HashT, RealNodeT] {
+  def add(nodes:RealNodeT*):SelfT
+  def remove(nodes:RealNodeT*):SelfT
+}
+
+trait AssignmentPolicy[HashT, RealNodeT] {
+  trait Assigner {
+    def assign(assigned:Set[HashT], node:RealNodeT):Seq[HashT]
+    def snapshot():AssignmentPolicy[HashT, RealNodeT]
+  }
+  def newAssigner():Assigner
 }
 ```
