@@ -64,7 +64,7 @@ class SharrrdSpec extends Specification {
 
   "default AssignmentPolicy" should {
     "assign hash value for node" in {
-      val p = new HashRing.DefaultAssignmentPolicy[Int, TestNode](100, HashRing.RandomSource.fromJavaRandomInt(new java.util.Random(0L)))
+      val p = new DefaultAssignmentPolicy[Int, TestNode](100, RandomSource.fromJavaRandomInt(new java.util.Random(0L)))
 
       val assignResult = p.newAssigner().assign(Set(), TestNode(1))
 
@@ -77,16 +77,16 @@ class SharrrdSpec extends Specification {
   }
 
   "default HashRing" should {
-    val policy = new HashRing.DefaultAssignmentPolicy[Int, TestNode](100, HashRing.RandomSource.fromJavaRandomInt(new java.util.Random(0L)))
+    val policy = new DefaultAssignmentPolicy[Int, TestNode](100, RandomSource.fromJavaRandomInt(new java.util.Random(0L)))
 
     "lookup node from hash when only one registered node" in {
-      val hr = new HashRing.DefaultImpl(collection.immutable.TreeMap(1 -> TestNode(1)), policy)
+      val hr = new DefaultHashRing(collection.immutable.TreeMap(1 -> TestNode(1)), policy)
       hr.realNodeOf(1000) must_== TestNode(1)
       hr.realNodeOf(-1000) must_== TestNode(1)
     }
 
     "lookup node from hash when more registered nodes" in {
-      val hr = new HashRing.DefaultImpl(collection.immutable.TreeMap(1 -> TestNode(1), 10 -> TestNode(10)), policy)
+      val hr = new DefaultHashRing(collection.immutable.TreeMap(1 -> TestNode(1), 10 -> TestNode(10)), policy)
       hr.realNodeOf(1) must_== TestNode(1)
       hr.realNodeOf(2) must_== TestNode(10)
       hr.realNodeOf(10) must_== TestNode(10)
@@ -95,22 +95,22 @@ class SharrrdSpec extends Specification {
     }
 
     "add and remove node" in {
-      val hr = new HashRing.DefaultImpl(policy)
+      val hr = new DefaultHashRing(policy)
 
-      val hr2 = hr.add(Seq(TestNode(99)))
+      val hr2 = hr.add(TestNode(99))
 
       hr2.realNodeOf(1) must_== TestNode(99)
 
       val hr3 = hr2
-        .add(Seq(TestNode(1)))
-        .remove(Seq(TestNode(1), TestNode(99)))
-        .add(Seq(TestNode(33)))
+        .add(TestNode(1))
+        .remove(TestNode(1), TestNode(99))
+        .add(TestNode(33))
 
       hr3.realNodeOf(100) must_== TestNode(33)
     }
 
     "have permissive distribution" in {
-      val hr = new HashRing.DefaultImpl(policy).add(Seq(TestNode(1), TestNode(2), TestNode(3)))
+      val hr = new DefaultHashRing(policy).add(TestNode(1), TestNode(2), TestNode(3))
 
       val stat = (-10000 to 10000).view.map {i:Int => hr.realNodeOf(i * 100000).id}.foldLeft(Map.empty[Int, Int]){(a:Map[Int, Int], x:Int) =>
         a + (x -> ((a.get(x) getOrElse 0) + 1))
@@ -123,7 +123,6 @@ class SharrrdSpec extends Specification {
       val maxDiff = avg * 0.1
 
       stat.values.foreach { v =>
-        println(v)
         Math.abs(avg - v) must be_<(maxDiff)
       }
       ok

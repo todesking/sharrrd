@@ -1,5 +1,7 @@
 package com.todesking.sharrrd
 
+import scala.collection.immutable.{SortedMap, SortedSet, TreeMap}
+
 class Sharding[KeyT, HashT, RealNodeT](
   hasher:KeyT => HashT,
   val currentHashRing:HashRing[HashT, RealNodeT],
@@ -15,21 +17,18 @@ class Sharding[KeyT, HashT, RealNodeT](
 
   def operateUntil[A](key:KeyT, maxHistoryDepth:Int)(f:(HashRing[HashT, RealNodeT], RealNodeT) => Option[A]):Option[A] = {
     val hash = hashOf(key)
-    operate0(currentHashRing, hash, f) orElse operateOldUntil(hash, maxHistoryDepth)(f)
+    f(currentHashRing, currentHashRing.realNodeOf(hash)) orElse operateOldUntil(hash, maxHistoryDepth)(f)
   }
 
   def operateOldUntil[A](hash:HashT, maxHistoryDepth:Int)(f:(HashRing[HashT, RealNodeT], RealNodeT) => Option[A]):Option[A] = {
     oldHashRings.take(maxHistoryDepth).foreach {ring =>
-      operate0(ring, hash, f) match {
+      f(ring, ring.realNodeOf(hash)) match {
         case s@Some(_) => return s
         case None =>
       }
     }
     None
   }
-
-  private def operate0[A](hashRing:HashRing[HashT, RealNodeT], hash:HashT, f:(HashRing[HashT, RealNodeT], RealNodeT) => A):A =
-    f(hashRing, hashRing.realNodeOf(hash))
 }
 
 trait HashRing[HashT, RealNodeT] {
@@ -37,93 +36,86 @@ trait HashRing[HashT, RealNodeT] {
 }
 
 trait FlexibleHashRing[HashT, RealNodeT, SelfT <: HashRing[HashT, RealNodeT]] extends HashRing[HashT, RealNodeT] {
-  def add(nodes:Seq[RealNodeT]):SelfT
-  def remove(nodes:Seq[RealNodeT]):SelfT
+  def add(nodes:RealNodeT*):SelfT
+  def remove(nodes:RealNodeT*):SelfT
 }
 
-object HashRing {
-  import scala.collection.immutable.{SortedMap, SortedSet, TreeMap}
-
-  trait AssignmentPolicy[HashT, RealNodeT] {
-    trait Assigner {
-      def assign(assigned:Set[HashT], node:RealNodeT):Seq[HashT]
-      def snapshot():AssignmentPolicy[HashT, RealNodeT]
-    }
-    def newAssigner():Assigner
+trait AssignmentPolicy[HashT, RealNodeT] {
+  trait Assigner {
+    def assign(assigned:Set[HashT], node:RealNodeT):Seq[HashT]
+    def snapshot():AssignmentPolicy[HashT, RealNodeT]
   }
+  def newAssigner():Assigner
+}
 
-  object SerializableUtil {
-    def clone[A <: java.io.Serializable](value:A):A = {
-      val pIn = new java.io.PipedInputStream()
-      val pOut = new java.io.PipedOutputStream(pIn)
+object SerializableUtil {
+  def clone[A <: java.io.Serializable](value:A):A = {
+    val pIn = new java.io.PipedInputStream()
+    val pOut = new java.io.PipedOutputStream(pIn)
 
-      val oOut = new java.io.ObjectOutputStream(pOut)
-      val oIn = new java.io.ObjectInputStream(pIn)
+    val oOut = new java.io.ObjectOutputStream(pOut)
+    val oIn = new java.io.ObjectInputStream(pIn)
 
-      try {
-        oOut.writeObject(value)
-        oIn.readObject().asInstanceOf[A]
-      } finally {
-        try { oOut.close() } finally { oIn.close() }
+    try {
+      oOut.writeObject(value)
+      oIn.readObject().asInstanceOf[A]
+    } finally {
+      try { oOut.close() } finally { oIn.close() }
+    }
+  }
+}
+
+trait RandomSource[A] {
+  def nextValue():A
+  def copy():RandomSource[A]
+}
+
+object RandomSource {
+  def fromJavaRandomInt(r:java.util.Random):RandomSource[Int] = new RandomSource[Int] {
+    override def nextValue():Int = r.nextInt()
+    override def copy():RandomSource[Int] = fromJavaRandomInt(SerializableUtil.clone(r))
+  }
+}
+
+class DefaultAssignmentPolicy[HashT, RealNodeT](assignPerNode:Int, rand:RandomSource[HashT]) extends AssignmentPolicy[HashT, RealNodeT] {
+  val randomProto:RandomSource[HashT] = rand.copy()
+
+  def newAssigner() = new Assigner {
+    val random = randomProto.copy()
+    def assign(assigned:Set[HashT], node:RealNodeT):Seq[HashT] = {
+      (0 until assignPerNode) map { _ =>
+        var r = random.nextValue()
+        while(assigned.contains(r)) r = random.nextValue()
+        r
       }
     }
+    def snapshot() = new DefaultAssignmentPolicy(assignPerNode, random)
+  }
+}
+
+class DefaultHashRing[HashT, RealNodeT](
+  val table:SortedMap[HashT, RealNodeT],
+  val assignmentPolicy:AssignmentPolicy[HashT, RealNodeT]
+) extends FlexibleHashRing[HashT, RealNodeT, DefaultHashRing[HashT, RealNodeT]] {
+  def this(assignmentPolicy:AssignmentPolicy[HashT, RealNodeT])(implicit ev:Ordering[HashT]) =
+    this(SortedMap.empty[HashT, RealNodeT], assignmentPolicy)
+
+  override def realNodeOf(hash:HashT):RealNodeT = {
+    table.from(hash).values.headOption getOrElse table.values.head
   }
 
-  trait RandomSource[A] {
-    def nextValue():A
-    def copy():RandomSource[A]
+  override def add(nodes:RealNodeT*):DefaultHashRing[HashT, RealNodeT] = {
+    val policy = assignmentPolicy.newAssigner()
+    val assignments = for {
+        node <- nodes
+        key <- policy.assign(table.keySet, node)
+      } yield key -> node
+
+    new DefaultHashRing(table ++ assignments, policy.snapshot())
   }
 
-  object RandomSource {
-    def fromJavaRandomInt(r:java.util.Random):RandomSource[Int] = new RandomSource[Int] {
-      override def nextValue():Int = r.nextInt()
-      override def copy():RandomSource[Int] = fromJavaRandomInt(SerializableUtil.clone(r))
-    }
-  }
-
-  class DefaultAssignmentPolicy[HashT, RealNodeT](assignPerNode:Int, rand:RandomSource[HashT]) extends AssignmentPolicy[HashT, RealNodeT] {
-    val randomProto:RandomSource[HashT] = rand.copy()
-
-    def newAssigner() = new Assigner {
-      val random = randomProto.copy()
-      def assign(assigned:Set[HashT], node:RealNodeT):Seq[HashT] = {
-        (0 until assignPerNode) map { _ =>
-          var r = random.nextValue()
-          while(assigned.contains(r)) r = random.nextValue()
-          r
-        }
-      }
-      def snapshot() = new DefaultAssignmentPolicy(assignPerNode, random)
-    }
-  }
-
-  class DefaultImpl[HashT, RealNodeT](
-    val table:SortedMap[HashT, RealNodeT],
-    val assignmentPolicy:AssignmentPolicy[HashT, RealNodeT]
-  ) extends FlexibleHashRing[HashT, RealNodeT, DefaultImpl[HashT, RealNodeT]] {
-    def this(assignmentPolicy:AssignmentPolicy[HashT, RealNodeT])(implicit ev:Ordering[HashT]) =
-      this(SortedMap.empty[HashT, RealNodeT], assignmentPolicy)
-
-    override def realNodeOf(hash:HashT):RealNodeT = {
-      table.from(hash).values.headOption getOrElse table.values.head
-    }
-
-    override def add(nodes:Seq[RealNodeT]):DefaultImpl[HashT, RealNodeT] = {
-      val policy = assignmentPolicy.newAssigner()
-      val assignments = for {
-          node <- nodes
-          key <- policy.assign(table.keySet, node)
-        } yield key -> node
-
-      newInstance(table ++ assignments, policy.snapshot())
-    }
-
-    override def remove(nodes:Seq[RealNodeT]):DefaultImpl[HashT, RealNodeT] = {
-      newInstance(nodes.foldLeft(table) {(a, x) => a -- a.filter{case (k, v) => v == x}.keys}, assignmentPolicy)
-    }
-
-    private def newInstance(table:SortedMap[HashT, RealNodeT], policy:AssignmentPolicy[HashT, RealNodeT]) =
-      new DefaultImpl[HashT, RealNodeT](table, policy)
+  override def remove(nodes:RealNodeT*):DefaultHashRing[HashT, RealNodeT] = {
+    new DefaultHashRing(nodes.foldLeft(table) {(a, x) => a -- a.filter{case (k, v) => v == x}.keys}, assignmentPolicy)
   }
 }
 
