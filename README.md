@@ -73,4 +73,13 @@ trait AssignmentPolicy[HashT, RealNodeT] {
   }
   def newAssigner():Assigner
 }
+
+class DefaultAssignmentPolicy[HashT, RealNodeT](assignPerNode:Int, rand:RandomSource[HashT]) extends AssignmentPolicy[HashT, RealNodeT]
+
+class DefaultHashRing[HashT, RealNodeT](
+  val table:SortedMap[HashT, RealNodeT],
+  val assignmentPolicy:AssignmentPolicy[HashT, RealNodeT]
+) extends FlexibleHashRing[HashT, RealNodeT, DefaultHashRing[HashT, RealNodeT]] {
+  def this(assignmentPolicy:AssignmentPolicy[HashT, RealNodeT])(implicit ev:Ordering[HashT])
+}
 ```
