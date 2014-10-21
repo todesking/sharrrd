@@ -4,8 +4,8 @@
 
 ```
 Key =(hash algorithm)=> Hash code =(hash to node mapping)=> Real node
-                                  ~ HashRing[KeyT, HashT] ~
-    ~~~~~~~~~~~~~~~~~~~~ Sharding[KeyT, HashT, NodeT] ~~~~~
+                                  ~ HashRing[HashT, RealNodeT] ~
+    ~~~~~~~~~~~~~~~~ Sharding[KeyT, HashT, RealNodeT] ~~~~~
 ```
 
 You can customize hash and mapping algorithm. Default implementation available at `DefaultHashRing`.
