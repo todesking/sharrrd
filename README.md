@@ -3,9 +3,12 @@
 ## Basic architecture
 
 ```
-Key =(hash algorithm)=> Hash code =(hash to node mapping)=> Real node
-                                  ~ HashRing[HashT, RealNodeT] ~
-    ~~~~~~~~~~~~~~~~ Sharding[KeyT, HashT, RealNodeT] ~~~~~
+Key =(hash algorithm)=> Hash code ===(hash to node mapping)==> Real node
+                                  ~HashRing[HashT, RealNodeT]~
+                                  ~~~~(                  )~~~~
+                                  ~~~~(previous hash ring)~~~~
+                                  ~~~~(                  )~~~~
+    ~~~~~~~~~~~~~~~~ Sharding[KeyT, HashT, RealNodeT] ~~~~~~~~
 ```
 
 You can customize hash and mapping algorithm. Default implementation available at `DefaultHashRing`.
