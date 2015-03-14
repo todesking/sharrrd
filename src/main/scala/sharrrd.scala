@@ -1,6 +1,6 @@
 package com.todesking.sharrrd
 
-import scala.collection.immutable.{SortedMap, SortedSet, TreeMap}
+import scala.collection.immutable.SortedMap
 
 class Sharding[KeyT, HashT, RealNodeT](
   hasher:KeyT => HashT,
